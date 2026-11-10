@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Fremdwörter</string>
+    <string name="share_label">Als Fremdwort speichern</string>
+    <string name="process_label">Fremdwort merken</string>
+    <string name="tile_label">Neues Fremdwort</string>
+    <string name="shortcut_add">Neues Wort</string>
+    <string name="shortcut_quiz">Abfrage</string>
+</resources>

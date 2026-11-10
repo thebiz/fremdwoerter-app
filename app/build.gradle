@@ -1,0 +1,46 @@
+plugins {
+    id 'com.android.application'
+}
+
+def vCode = (project.findProperty('versionCode') ?: '1') as Integer
+
+android {
+    namespace 'de.thebiz.fremdwoerter'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'de.thebiz.fremdwoerter'
+        minSdk 26
+        targetSdk 34
+        versionCode vCode
+        versionName "0.${vCode}"
+    }
+
+    signingConfigs {
+        release {
+            storeFile rootProject.file('keystore/release.jks')
+            storePassword 'fremdwoerter'
+            keyAlias 'fremdwoerter'
+            keyPassword 'fremdwoerter'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+        debug {
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+}
