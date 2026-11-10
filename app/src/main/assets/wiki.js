@@ -107,5 +107,52 @@
     return res;
   }
 
-  global.Wiki = { parse, clean };
+  /* ---------- DWDS (www.dwds.de/wb/…) ---------- */
+  const txt = el => (el ? el.textContent : '').replace(/\s+/g, ' ').replace(/\s+([,.;:!?])/g, '$1').trim();
+
+  function parseDwds(html) {
+    const res = { bedeutungen: [], silben: '', beispiele: [], wortart: '' };
+    if (!html) return res;
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const art = doc.querySelector('.dwdswb-artikel') || doc;
+
+    // Kopfdaten: „Worttrennung“, „Grammatik“
+    art.querySelectorAll('.dwdswb-ft-block').forEach(b => {
+      const label = txt(b.querySelector('.dwdswb-ft-blocklabel')).toLowerCase();
+      const val = txt(b.querySelector('.dwdswb-ft-blocktext'));
+      if (!val) return;
+      if (label.startsWith('worttrennung') && !res.silben) res.silben = val.split(/[,;]/)[0].replace(/-/g, '·').trim();
+      if (label.startsWith('grammatik') && !res.wortart) res.wortart = val.split(/[·,;(]/)[0].trim();
+    });
+
+    // Bedeutungen: jede Lesart mit eigener Definition
+    const seen = new Set();
+    const lesarten = art.querySelectorAll('.dwdswb-lesart');
+    lesarten.forEach(l => {
+      const def = l.querySelector(':scope > .dwdswb-lesart-content .dwdswb-definition, :scope > .dwdswb-lesart-def .dwdswb-definition')
+        || l.querySelector('.dwdswb-definition');
+      if (!def) return;
+      let t = txt(def);
+      if (!t || seen.has(t)) return;
+      seen.add(t);
+      const dia = l.querySelector('.dwdswb-diasystematik');
+      const d = dia && l.contains(def) && dia.compareDocumentPosition(def) & Node.DOCUMENT_POSITION_FOLLOWING ? txt(dia) : '';
+      if (d && d.length < 40 && !t.startsWith(d)) t = d + ': ' + t;
+      const nr = txt(l.querySelector('.dwdswb-lesart-n')).replace(/\.$/, '');
+      res.bedeutungen.push({ nr, text: t });
+    });
+    if (!res.bedeutungen.length) {
+      art.querySelectorAll('.dwdswb-definition').forEach(d => {
+        const t = txt(d);
+        if (t && !seen.has(t)) { seen.add(t); res.bedeutungen.push({ nr: '', text: t }); }
+      });
+    }
+    res.bedeutungen.forEach((b, i) => { if (!b.nr || !/^[\dIVX]+[a-z]?$/i.test(b.nr)) b.nr = String(i + 1); });
+
+    const bsp = art.querySelector('.dwdswb-kompetenzbeispiel .dwdswb-belegtext') || art.querySelector('.dwdswb-belegtext');
+    if (bsp) { const t = txt(bsp); if (t && t.length < 260) res.beispiele.push({ nr: '', text: t }); }
+    return res;
+  }
+
+  global.Wiki = { parse, clean, parseDwds };
 })(window);

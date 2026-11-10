@@ -326,6 +326,33 @@ public class MainActivity extends Activity {
             }).start();
         }
 
+        /** Holt die DWDS-Wörterbuchseite als HTML (zweite Quelle). */
+        @JavascriptInterface
+        public void lookupDwds(final String word, final String cb) {
+            new Thread(() -> {
+                try {
+                    String url = "https://www.dwds.de/wb/" + URLEncoder.encode(word.trim(), "UTF-8").replace("+", "%20");
+                    HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+                    c.setConnectTimeout(8000);
+                    c.setReadTimeout(12000);
+                    c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 15) Fremdwoerter-App");
+                    c.setRequestProperty("Accept-Language", "de");
+                    int code = c.getResponseCode();
+                    if (code == 404) {
+                        callback(cb, "{\"ok\":false,\"error\":\"notfound\"}");
+                        return;
+                    }
+                    if (code != 200) throw new Exception("HTTP " + code);
+                    JSONObject o = new JSONObject();
+                    o.put("ok", true);
+                    o.put("html", Store.readStream(c.getInputStream()));
+                    callback(cb, o.toString());
+                } catch (Exception e) {
+                    callback(cb, "{\"ok\":false,\"error\":\"offline\"}");
+                }
+            }).start();
+        }
+
         private String fetchRaw(String title) throws Exception {
             String url = "https://de.wiktionary.org/w/index.php?action=raw&title="
                     + URLEncoder.encode(title.replace(' ', '_'), "UTF-8");

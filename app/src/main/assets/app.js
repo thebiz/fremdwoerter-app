@@ -16,6 +16,13 @@
 
 {{Beispiele}}
 :[2] Die '''Agglomeration''' Zürich wächst weiter.`;
+    const mockDwds = `<div class="dwdswb-artikel">
+      <div class="dwdswb-ft-block"><span class="dwdswb-ft-blocklabel">Grammatik</span><span class="dwdswb-ft-blocktext">Verb · travestiert, travestierte, hat travestiert</span></div>
+      <div class="dwdswb-ft-block"><span class="dwdswb-ft-blocklabel">Worttrennung</span><span class="dwdswb-ft-blocktext">tra-ves-tie-ren</span></div>
+      <div class="dwdswb-lesarten"><div class="dwdswb-lesart"><div class="dwdswb-lesart-def">
+        <span class="dwdswb-diasystematik">Literatur</span> <span class="dwdswb-definition">ein literarisches Werk in eine Travestie umwandeln</span></div></div>
+        <div class="dwdswb-lesart"><div class="dwdswb-lesart-def"><span class="dwdswb-definition">mit einer Travestie lächerlich machen</span></div>
+        <div class="dwdswb-kompetenzbeispiel"><span class="dwdswb-belegtext">ein Epos travestieren</span></div></div></div></div>`;
     const cbs = {};
     return {
       load: () => localStorage.getItem('fw-data') || '',
@@ -31,6 +38,7 @@
       hideKeyboard: () => document.activeElement && document.activeElement.blur(),
       lookup: (w, cb) => setTimeout(() => window.__cb(cb, JSON.stringify(
         /x{3}/.test(w) ? { ok: false, error: 'notfound' } : { ok: true, title: w, text: mockWiki })), 500),
+      lookupDwds: (w, cb) => setTimeout(() => window.__cb(cb, JSON.stringify({ ok: true, html: mockDwds })), 400),
       checkUpdate: (cb) => setTimeout(() => window.__cb(cb, '{"ok":true,"tag":"v1"}'), 400),
       pickFile: (cb) => setTimeout(() => window.__cb(cb, JSON.stringify({ ok: true, text: 'Wort;Bedeutung\nTestwort;eine Bedeutung', name: 'test.csv' })), 200),
       saveFile: (n, m, c, cb) => { console.log('saveFile', n, c.length); setTimeout(() => window.__cb(cb, '{"ok":true}'), 200); }
@@ -100,6 +108,7 @@
       wortart: w.wortart || '',
       tags: Array.isArray(w.tags) ? w.tags : [],
       auto: !!w.auto,
+      quelle: w.quelle || (w.auto ? 'Wiktionary' : ''),
       erstellt: w.erstellt || Date.now(),
       box: w.box || 0,
       faellig: w.faellig || 0,
@@ -204,6 +213,7 @@
   /* ================= Tabs ================= */
   function setTab(t) {
     ui.tab = t;
+    { const g = document.getElementById('azgrip'); g && g.classList.remove('on'); }
     document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
     render();
     window.scrollTo(0, 0);
@@ -313,12 +323,15 @@
         <div class="w">${esc(w.wort)}</div>
         <div class="m">${esc(plainMeaning(w.bedeutung))}</div></div>`;
     }
+    if (!q && ui.filter === 'auto' && list.length) {
+      html += `<div class="autobar">${ICON.check}<span>Passt alles?</span><button data-act="clearauto">Alle als geprüft markieren</button></div>`;
+    }
     if (!q) {
       html += `<div class="sortbar"><span>${list.length} ${list.length === 1 ? 'Eintrag' : 'Einträge'}</span>
         <div class="seg">
-          <button data-act="sort" data-s="az" class="${ui.sort === 'az' ? 'on' : ''}">A–Z</button>
           <button data-act="sort" data-s="new" class="${ui.sort === 'new' ? 'on' : ''}">Neueste</button>
           <button data-act="sort" data-s="hard" class="${ui.sort === 'hard' ? 'on' : ''}">Schwierig</button>
+          <button data-act="sort" data-s="az" class="az ${ui.sort === 'az' ? 'on' : ''}">A–Z</button>
         </div></div>`;
     }
     if (!list.length) {
@@ -331,7 +344,7 @@
         if (!q && ui.sort === 'az') {
           const L = norm(w.wort).charAt(0).toUpperCase() || '#';
           const letter = /[A-Z]/.test(L) ? L : '#';
-          if (letter !== last) { html += `<div class="letter">${letter}</div>`; last = letter; }
+          if (letter !== last) { html += `<div class="letter" data-letter="${letter}">${letter}</div>`; last = letter; }
         }
         html += itemHtml(w, q);
       }
@@ -340,7 +353,7 @@
   }
 
   /* ================= Ebenen ================= */
-  function pushLayer(l) { ui.layers.push(l); renderLayers(); }
+  function pushLayer(l) { ui.layers.push(l); renderLayers(); const g = document.getElementById('azgrip'); g && g.classList.remove('on'); }
   function popLayer() {
     const l = ui.layers.pop();
     if (l && l.type === 'dialog') l.res(false);
@@ -410,7 +423,7 @@
       <div class="det">
         <div class="w">${esc(w.wort)}</div>
         ${meta.length ? `<div class="meta">${meta.join('')}</div>` : ''}
-        <div class="sec"><h3>Bedeutung${w.auto ? ' <span class="badge">aus Wiktionary</span>' : ''}</h3>
+        <div class="sec"><h3>Bedeutung${w.auto ? ` <span class="badge">aus ${esc(w.quelle || 'Wiktionary')}</span>` : ''}</h3>
           ${hasMeaning(w) ? meaningHtml(w.bedeutung)
             : `<div class="missing-box">Noch keine Bedeutung hinterlegt.<div class="btnrow" style="margin-top:12px">
                 <button class="btn pri" data-act="editlookup" data-id="${esc(w.id)}">${ICON.search} Nachschlagen</button></div></div>`}
@@ -484,7 +497,7 @@
     const s = l.sugg;
     if (!s) return '';
     return `<div class="sugg">
-      <div class="h"><b>Vorschlag aus Wiktionary</b><span>${esc([s.wortart, s.silben].filter(Boolean).join(' · '))}</span></div>
+      <div class="h"><b>Vorschlag aus ${esc(s.quelle || 'Wiktionary')}</b><span>${esc([s.wortart, s.silben].filter(Boolean).join(' · '))}</span></div>
       ${s.bedeutungen.map((b, i) => `<div class="opt ${s.sel[i] ? 'on' : ''}" data-act="togsugg" data-i="${i}">
         <div class="ck">${ICON.check}</div><div class="tx">${b.nr ? `<b>[${esc(b.nr)}]</b> ` : ''}${esc(b.text)}</div></div>`).join('')}
       ${s.beispiele.length ? `<div class="opt ${s.bsel ? 'on' : ''}" data-act="togbsp"><div class="ck">${ICON.check}</div><div class="tx">Beispiel: <em>${esc(s.beispiele[0].text)}</em></div></div>` : ''}
@@ -526,22 +539,37 @@
     tin.addEventListener('blur', () => { if (tin.value.trim()) commit(); });
   }
 
+  /** Erst Wiktionary, dann DWDS */
+  async function findMeaning(word) {
+    let offline = false;
+    const r = await call('lookup', word);
+    if (r.ok) {
+      const p = Wiki.parse(r.text);
+      if (p.bedeutungen.length) return { ok: true, p, quelle: 'Wiktionary', title: r.title };
+    } else if (r.error === 'offline') offline = true;
+    if (A.lookupDwds) {
+      const d = await call('lookupDwds', word);
+      if (d.ok) {
+        const p = Wiki.parseDwds(d.html);
+        if (p.bedeutungen.length) return { ok: true, p, quelle: 'DWDS', title: word };
+      } else if (d.error !== 'offline') offline = false;
+    }
+    return { ok: false, error: offline ? 'offline' : 'notfound' };
+  }
+
   async function lookupInto(l) {
     const word = l.draft.wort.trim();
     if (!word || l.loading) return;
     l.loading = true; l.lookErr = ''; renderLayers();
-    const r = await call('lookup', word);
+    const r = await findMeaning(word);
     l.loading = false;
     if (!r.ok) {
-      l.lookErr = r.error === 'offline' ? 'Keine Verbindung – bitte später noch mal versuchen.' : `Zu „${word}“ hat Wiktionary keinen Eintrag. Schau mal bei Duden oder DWDS.`;
+      l.lookErr = r.error === 'offline' ? 'Keine Verbindung – bitte später noch mal versuchen.' : `Zu „${word}“ haben weder Wiktionary noch DWDS einen Eintrag. Probier’s mal beim Duden.`;
       l.sugg = null;
     } else {
-      const p = Wiki.parse(r.text);
-      if (!p.bedeutungen.length) { l.lookErr = 'Eintrag gefunden, aber ohne deutsche Bedeutung.'; l.sugg = null; }
-      else {
-        l.sugg = { ...p, sel: p.bedeutungen.map((b, i) => i < 3 && !/^\d+[a-z]$/.test(b.nr)), bsel: !l.draft.beispiel && p.beispiele.length > 0 };
-        if (r.title && r.title !== word && !l.id && norm(r.title) !== norm(word)) l.draft.wort = r.title;
-      }
+      const p = r.p;
+      l.sugg = { ...p, quelle: r.quelle, sel: p.bedeutungen.map((b, i) => i < 3 && !/^\d+[a-z]$/.test(b.nr)), bsel: !l.draft.beispiel && p.beispiele.length > 0 };
+      if (r.title && r.title !== word && !l.id && norm(r.title) !== norm(word)) l.draft.wort = r.title;
     }
     renderLayers();
   }
@@ -558,6 +586,7 @@
     if (s.bsel && s.beispiele.length) l.draft.beispiel = s.beispiele[0].text;
     if (!l.draft.silben && s.silben) l.draft.silben = s.silben;
     if (s.wortart) l.draft.wortart = s.wortart;
+    l.draft.quelle = s.quelle || '';
     l.sugg = null;
     renderLayers();
   }
@@ -764,6 +793,7 @@
     const time = String(daily.hour).padStart(2, '0') + ':' + String(daily.minute).padStart(2, '0');
     const missing = D.woerter.filter(w => !hasMeaning(w)).length;
     const learned = D.woerter.filter(w => w.box >= 4).length;
+    const autoN = D.woerter.filter(w => w.auto).length;
     const b = ui.bulk;
     $('#view').innerHTML = `
       <div class="head"><h1>Mehr</h1><div class="sub">${D.woerter.length} Wörter · ${learned} sitzen sicher</div></div>
@@ -784,9 +814,11 @@
       <div class="group">
         <button class="row" data-act="bulk" ${missing && !b ? '' : 'disabled'}><span class="ic">${ICON.wand}</span>
           <span class="tx"><b>${b && b.running ? 'Schlage nach …' : missing ? `${missing} fehlende Bedeutungen nachschlagen` : 'Alle Wörter haben eine Bedeutung'}</b>
-          <span>${missing ? 'Holt Vorschläge aus Wiktionary, markiert als „auto“' : 'Sehr ordentlich!'}</span></span></button>
+          <span>${missing ? 'Holt Vorschläge aus Wiktionary und DWDS, markiert als „auto“' : 'Sehr ordentlich!'}</span></span></button>
         ${b ? `<div class="bulk"><div class="pb"><i style="width:${Math.round(b.done / b.total * 100)}%"></i></div>
           <div class="s">${b.running ? `${b.done} von ${b.total} … ${esc(b.current || '')}` : `Fertig: ${b.found} ergänzt, ${b.total - b.found} nicht gefunden`}</div></div>` : ''}
+        ${autoN ? `<button class="row" data-act="clearauto"><span class="ic">${ICON.check}</span>
+          <span class="tx"><b>Alle „auto“-Markierungen entfernen</b><span>${autoN} ${autoN === 1 ? 'Wort' : 'Wörter'} als geprüft übernehmen</span></span></button>` : ''}
       </div>
 
       <div class="gtitle">Daten</div>
@@ -821,16 +853,17 @@
     for (const w of list) {
       ui.bulk.current = w.wort;
       if (ui.tab === 'more') renderMore();
-      const r = await call('lookup', w.wort);
+      const r = await findMeaning(w.wort);
       if (r.ok) {
-        const p = Wiki.parse(r.text);
-        if (p.bedeutungen.length) {
+        const p = r.p;
+        {
           const main = p.bedeutungen.filter(b => !/^\d+[a-z]$/.test(b.nr)).slice(0, 3);
           w.bedeutung = formatMeanings(main.length ? main : p.bedeutungen.slice(0, 2));
           if (!w.silben && p.silben) w.silben = p.silben;
           if (!w.beispiel && p.beispiele.length) w.beispiel = p.beispiele[0].text;
           if (p.wortart) w.wortart = p.wortart;
           w.auto = true;
+          w.quelle = r.quelle;
           ui.bulk.found++;
           save();
         }
@@ -966,7 +999,7 @@
       case 'approve': { const w = byId(t.dataset.id); w.auto = false; save(); renderLayers(); toast('Abgehakt'); break; }
       case 'url': A.openUrl(t.dataset.u); break;
       case 'filter': ui.filter = t.dataset.f; renderList(); break;
-      case 'sort': ui.sort = t.dataset.s; renderListBody(); break;
+      case 'sort': if (az.suppress) break; ui.sort = t.dataset.s; renderListBody(); break;
       case 'clearq': ui.q = ''; renderList(); break;
       case 'lookup': readDraft($('#layer .sheet:last-child'), l); A.hideKeyboard(); lookupInto(l); break;
       case 'togsugg': l.sugg.sel[+t.dataset.i] = !l.sugg.sel[+t.dataset.i]; readDraft($('#layer .sheet:last-child'), l); renderLayers(); break;
@@ -1001,6 +1034,16 @@
       }
       case 'testdaily': A.testNotify(); break;
       case 'bulk': bulkLookup(); break;
+      case 'clearauto': {
+        const n = D.woerter.filter(w => w.auto).length;
+        const ok = await confirmDlg('Alle Markierungen entfernen?', `Die automatisch ergänzten Bedeutungen von ${n} ${n === 1 ? 'Wort' : 'Wörtern'} bleiben erhalten, nur das „auto“-Etikett verschwindet.`, 'Entfernen');
+        if (!ok) break;
+        D.woerter.forEach(w => { w.auto = false; });
+        if (ui.filter === 'auto') ui.filter = 'all';
+        saveNow(); render();
+        toast('Alle Markierungen entfernt');
+        break;
+      }
       case 'export': {
         const r = await call('saveFile', `fremdwoerter-${stamp()}.json`, 'application/json', JSON.stringify(D, null, 1));
         if (r.ok) toast('Sicherung gespeichert');
@@ -1015,6 +1058,99 @@
       case 'update': checkUpdate(); break;
     }
   });
+
+
+  /* ================= A–Z-Schnellleiste ================= */
+  const az = { active: false, letters: [], cur: '', timer: null, suppress: false, hideT: null, startX: 0, startY: 0, from: '' };
+  const azBar = document.createElement('div'); azBar.id = 'azbar';
+  const azBubble = document.createElement('div'); azBubble.id = 'azbubble';
+  const azGrip = document.createElement('div'); azGrip.id = 'azgrip';
+  document.body.append(azBar, azBubble, azGrip);
+
+  const azUsable = () => ui.tab === 'list' && !ui.layers.length && !ui.q.trim() && ui.sort === 'az';
+
+  function azStart(y, from) {
+    if (ui.sort !== 'az') { ui.sort = 'az'; renderListBody(); }
+    if (!azUsable()) return;
+    az.letters = [...document.querySelectorAll('#listbody .letter')].map(e => e.dataset.letter);
+    if (az.letters.length < 2) return;
+    az.active = true; az.cur = ''; az.from = from;
+    azBar.innerHTML = az.letters.map(l => `<span data-l="${l}">${l}</span>`).join('');
+    azBar.classList.add('on'); azBubble.classList.add('on');
+    azGrip.classList.add('on', 'drag');
+    clearTimeout(az.hideT);
+    try { navigator.vibrate && navigator.vibrate(12); } catch (e) { }
+    azMove(y);
+  }
+
+  function azMove(y) {
+    if (!az.active) return;
+    const r = azBar.getBoundingClientRect();
+    const n = az.letters.length;
+    const i = Math.max(0, Math.min(n - 1, Math.floor((y - r.top) / r.height * n)));
+    const L = az.letters[i];
+    azGrip.style.top = Math.max(r.top - 30, Math.min(r.bottom - 30, y - 30)) + 'px';
+    if (L === az.cur) return;
+    az.cur = L;
+    azBubble.textContent = L;
+    azBar.querySelectorAll('span').forEach(s => s.classList.toggle('on', s.dataset.l === L));
+    const el = document.querySelector(`#listbody .letter[data-letter="${L}"]`);
+    if (el) {
+      const sticky = ($('.search') || { offsetHeight: 0 }).offsetHeight;
+      window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - sticky + 2);
+    }
+    try { navigator.vibrate && navigator.vibrate(5); } catch (e) { }
+  }
+
+  function azEnd() {
+    if (!az.active) return;
+    az.active = false;
+    azBar.classList.remove('on'); azBubble.classList.remove('on');
+    azGrip.classList.remove('drag');
+    az.suppress = true; setTimeout(() => { az.suppress = false; }, 450);
+    azHideGripSoon();
+  }
+
+  function azHideGripSoon() {
+    clearTimeout(az.hideT);
+    az.hideT = setTimeout(() => { if (!az.active) azGrip.classList.remove('on'); }, 1400);
+  }
+
+  // Griff am Rand: erscheint beim Scrollen
+  window.addEventListener('scroll', () => {
+    if (az.active) return;
+    if (!azUsable() || document.body.scrollHeight < window.innerHeight * 2.5) { azGrip.classList.remove('on'); return; }
+    const top = 140, bottom = window.innerHeight - 64 - 100;
+    const max = document.body.scrollHeight - window.innerHeight;
+    azGrip.style.top = (top + (bottom - top) * Math.min(1, window.scrollY / Math.max(1, max))) + 'px';
+    azGrip.classList.add('on');
+    azHideGripSoon();
+  }, { passive: true });
+
+  document.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    if (e.target.closest('#azgrip') && azGrip.classList.contains('on')) {
+      e.preventDefault();
+      azStart(t.clientY, 'grip');
+      return;
+    }
+    const btn = e.target.closest('.sortbar .az');
+    if (!btn) return;
+    az.startX = t.clientX; az.startY = t.clientY;
+    clearTimeout(az.timer);
+    az.timer = setTimeout(() => azStart(az.startY, 'button'), 380);
+  }, { passive: false });
+
+  document.addEventListener('touchmove', e => {
+    const t = e.touches[0];
+    if (az.active) { e.preventDefault(); azMove(t.clientY); return; }
+    if (az.timer && Math.hypot(t.clientX - az.startX, t.clientY - az.startY) > 10) { clearTimeout(az.timer); az.timer = null; }
+  }, { passive: false });
+
+  const azStop = () => { clearTimeout(az.timer); az.timer = null; azEnd(); };
+  document.addEventListener('touchend', azStop);
+  document.addEventListener('touchcancel', azStop);
+  document.addEventListener('contextmenu', e => { if (az.active || e.target.closest('.sortbar .az')) e.preventDefault(); });
 
   /* ================= Zurück-Taste & externe Aktionen ================= */
   window.onBack = function () {

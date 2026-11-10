@@ -350,3 +350,38 @@ button.row:active { background: var(--s2); }
 .dlg h2 { font: 600 21px/1.25 var(--serif); margin: 0 0 8px; }
 .dlg p { color: var(--tx2); margin: 0 0 20px; font-size: 14.5px; }
 .dlg .btnrow .btn { flex: 1; justify-content: center; }
+
+/* ---------- A–Z-Schnellleiste ---------- */
+.seg button.az { position: relative; }
+#azbar {
+  position: fixed; right: 8px; top: 132px; bottom: calc(var(--tabh) + 92px); width: 34px; z-index: 30;
+  display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+  padding: 12px 0; border-radius: 17px; background: rgba(31, 31, 35, .94); border: 1px solid var(--line);
+  opacity: 0; pointer-events: none; transition: opacity .15s;
+}
+#azbar.on { opacity: 1; }
+#azbar span { font: 600 11px/1 var(--sans); color: var(--tx3); transition: transform .1s, color .1s; }
+#azbar span.on { color: var(--ac); transform: scale(1.7); }
+#azbubble {
+  position: fixed; left: 50%; top: 42%; width: 104px; height: 104px; margin: -52px 0 0 -52px; z-index: 31;
+  border-radius: 30px; background: var(--s2); border: 1px solid #332d22;
+  display: flex; align-items: center; justify-content: center;
+  font: 600 58px/1 var(--serif); color: var(--ac);
+  opacity: 0; transform: scale(.85); transition: opacity .15s, transform .15s; pointer-events: none;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .5);
+}
+#azbubble.on { opacity: 1; transform: none; }
+#azgrip {
+  position: fixed; right: 0; top: 140px; width: 44px; height: 60px; z-index: 32;
+  opacity: 0; pointer-events: none; transition: opacity .25s; touch-action: none;
+  display: flex; align-items: center; justify-content: flex-end; padding-right: 5px;
+}
+#azgrip::after { content: ''; width: 5px; height: 42px; border-radius: 3px; background: var(--tx3); transition: background .15s, width .15s; }
+#azgrip.on { opacity: 1; pointer-events: auto; }
+#azgrip.drag::after { background: var(--ac); width: 6px; }
+#azgrip.drag { opacity: 0; }
+
+.autobar { display: flex; align-items: center; gap: 10px; margin: 4px 20px 8px; padding: 12px 14px; border-radius: 14px; background: var(--ac-dim); color: var(--tx2); font-size: 13.5px; }
+.autobar svg { width: 18px; height: 18px; color: var(--ac); flex: none; }
+.autobar span { flex: 1; }
+.autobar button { color: var(--ac); font-weight: 600; font-size: 13.5px; }
